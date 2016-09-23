@@ -1,32 +1,19 @@
 #!/usr/bin/env ruby
+require 'optparse'
 require "net/http"
 require "json"
 
-def parse_options
-  options = {}
-  case ARGV[1]
-  when "-f"
-    options[:f] = ARGV[2]
-  end
-  options
+def read_file(file)
+	File.read(file)
 end
 
-def load_file(file)
-	begin
-		gist = File.read(file)
-		make_request(file,gist)
-	rescue
-		STDOUT.puts "Cannot locate the file: #{file}"
-	end
-end
-
-def make_request(file,gist)
+def make_request(filename,gist_content,options)
 	payload = {
-	  'description' => "My gist",
+	  'description' => options[:description] || "My gist",
 	  'public' => true,
 	  'files' => {
-	    file => {
-	      'content' => gist
+	    filename => {
+	      'content' => gist_content
 	    }
 	  }
 	}
@@ -41,17 +28,54 @@ def make_request(file,gist)
 	end
 
 	STDOUT.puts res.inspect
-	STDOUT.puts res.body.inspect
+	STDOUT.puts ""
+	STDOUT.puts res.body.inspect if options[:verbose]
+	STDOUT.puts ""
+	STDOUT.puts ""
+	STDOUT.puts "New Gist created at:"
+	STDOUT.puts JSON.parse(res.body)['html_url']
+	STDOUT.puts ""
 end
 
-case ARGV[0]
-	when "create"
-		the_file_name = parse_options[:f] || "sample.rb"
-		the_file_contents = load_file(the_file_name)
-	else 
-	  STDOUT.puts <<-EOF
-	Please provide command name
-	Usage: 
-	  gist create [-f] filename
-	EOF
+options = {}
+
+opt_parser = OptionParser.new do |opt|
+  opt.banner = "Usage: gist [FILE] [OPTIONS]"
+  opt.separator  ""
+  opt.separator  "Commands"
+  opt.separator  "     <blank>: create a new gist in text editor"
+  opt.separator  "     <file>:  create a new gist using the specified file"
+  opt.separator  "     login:   log in to github account"
+  opt.separator  ""
+  opt.separator  "Options"
+  # opt.separator  "     -lns: choose which lines in the file should be included in gist"
+  opt.separator  "     -d:   set the description of the gist"
+  opt.separator  "     -v:   view full http response"
+
+  opt.on("-d","--description DESCRIPTION","set the gist description") do |description|
+    options[:description] = description
+  end
+
+  opt.on("-v","--verbose","view full response of the http request") do
+    options[:verbose] = true
+  end
+
+  opt.on("-h","--help","help") do
+    puts opt_parser
+  end
 end
+
+opt_parser.parse!
+
+if Dir.entries(".").include? ARGV[0]
+	contents = read_file(ARGV[0])
+	make_request(ARGV[0],contents,options)
+else
+	case ARGV[0]
+		when "new"
+			puts "TODO: creating a new gist..."
+		else
+		  puts opt_parser
+	end
+end
+
