@@ -12,7 +12,6 @@ Gem::Specification.new do |s|
 
   s.executables << 'gist'
 
-  s.add_development_dependency 'optparse'
   s.add_development_dependency 'httparty'
   s.add_development_dependency 'json'
 end
