@@ -48,7 +48,7 @@ else
 		when "help"
 		  puts opt_parser
 		else
-			file = ARGV[0] || gisterday_file.rb
+			file = ARGV[0] || "gisterday_file.rb"
 			system %Q(vim +"put ='# When you save this file, a gist will be created.'" #{file})
 
 			# check if user saved and create gist if so

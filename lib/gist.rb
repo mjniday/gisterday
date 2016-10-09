@@ -8,15 +8,27 @@ module Gisterday
   TOKEN_LOCATION = ENV['HOME'] + "/.gisterday"
 
 	class GitHubAuth
-		attr_accessor :username, :password, :two_factor
-		
-		def initialize
-			@two_factor = false
-			get_credentials
-		end
+		attr_accessor :username, :password, :two_factor, :base_request_options
+
+    def initialize
+      get_credentials
+      @base_request_options = {
+        :headers => {
+          'User-Agent' => 'gisterday'
+        },
+        :basic_auth => {
+          :username => @username, 
+          :password => @password
+        },
+        :body => {
+          :note => 'Gisterday CLI for creating gists',
+          :scopes => ["gist"]
+        }.to_json
+      }
+    end
 
 		def get_credentials
-			puts "What's your username?"
+			puts "What is your username?"
 			@username = STDIN.gets.chomp
 			`stty -echo`
 			puts "What is your password?"
@@ -24,47 +36,39 @@ module Gisterday
 			`stty echo`
 		end
 
+    def auth_request(options)
+      HTTParty.post(AUTH_URL,options)
+    end
+
 		def begin_authentication
-			auth_credentials = {:username => @username, :password => @password}
-			request_options = {
-				:headers => {
-					'User-Agent' => @username
-				},
-				:basic_auth => auth_credentials
-			}
-			request = HTTParty.post(AUTH_URL,request_options)
-			
-			if request.headers.inspect["x-github-otp"]
+      request = auth_request(@base_request_options)
+
+			if request.code == 401 && request.headers["X-GitHub-OTP"].match(/required/)
 				puts "Enter Two-Factor Auth Code:"
 				@two_factor = STDIN.gets.chomp
 				finish_authentication
+      elsif request.code == 201 && request['token']
+        write_token_file(TOKEN_LOCATION,request['token'])
+      else
+        puts "Request returned with the code: #{request.code}"
 			end
 		end
 
 		def finish_authentication
-			auth_credentials = {:username => @username, :password => @password}
-			request_options = {
-				:headers => {
-					'X-GitHub-OTP' => @two_factor,
-					'User-Agent' => 'gisterday'
-				},
-				:basic_auth => auth_credentials,
-				:body => {
-					:note => 'Gisterday CLI for creating gists',
-					:scopes => ["gist"],
-					:client_id => "96b65551444fdde8a6d8",
-					:client_secret => "2213cd8ada533e9d9ec8ac4a993dbeaa85b3076d"
-				}.to_json
-			}
-			request = HTTParty.post(AUTH_URL,request_options)
-      
+      @base_request_options[:headers]['X-GitHub-OTP'] = @two_factor
+      request = auth_request(@base_request_options)
+
 			if request.code == 201
-        # For persistence, write the token to a file '.gisterday' in the home directory
-        File.open(TOKEN_LOCATION, "w") { |f| f.write(request['token']) }
-				puts "Logged in as #{@username}"
+				write_token_file(TOKEN_LOCATION,request['token'])
       else
         puts "Request returned with the code: #{request.code}"
 			end
+		end
+
+		def write_token_file(location,token)
+			# For persistence, write the token to a file '.gisterday' in the user's home directory
+			File.open(location, "w") { |f| f.write(token) }
+			puts "Logged in as #{@username}"
 		end
 	end
 
@@ -74,9 +78,9 @@ module Gisterday
 
   def self.get_token
     begin
-      token = read_file(TOKEN_LOCATION)
+      read_file(TOKEN_LOCATION)
     rescue
-      token = false
+      false
     end
   end
 
@@ -99,6 +103,8 @@ module Gisterday
 		end
 
 		req = HTTParty.post(GIST_URL,request_options)	
+    puts "Here are the options..."
+    puts options
 		format_response(req,options)
 	end
 
