@@ -5,7 +5,7 @@ describe Gisterday::GitHubAuth do
   let(:username) { "username"}
   let(:password) { "password"}
   let(:instance) { described_class.new(username,password) }
-
+  
   describe 'default object' do
     let(:credentials) { 'fake_credentials' }
     

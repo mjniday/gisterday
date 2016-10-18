@@ -35,9 +35,9 @@ if Dir.entries(".").include? ARGV[0]
   gist.add_file(file)
   gist.push_gist
 else
-	case ARGV[0]
-		when "login"
-			puts "Logging in..."
+  case ARGV[0]
+    when "login"
+      puts "Logging in..."
       puts "What is your username?"
       username = STDIN.gets.chomp
       `stty -echo`
@@ -45,20 +45,20 @@ else
       password = STDIN.gets.chomp
       `stty echo`
       authentication = Gisterday::GitHubAuth.new(username,password)
-			authentication.begin_authentication
-		when "help"
-		  puts opt_parser
-		else
-			file = ARGV[0] || "gisterday_file.rb"
+      authentication.begin_authentication
+    when "help"
+      puts opt_parser
+    else
+      file = ARGV[0] || "gisterday_file.rb"
       # if `file` gets saved, it will be in the current directory
-			system %Q(vim +"put ='# When you save this file, a gist will be created.'" #{file})
+      system %Q(vim +"put ='# When you save this file, a gist will be created.'" #{file})
 
-			# check if user saved and create gist if so
-			if Dir.entries(".").include? file
+      # check if user saved and create gist if so
+      if Dir.entries(".").include? file
         gist = Gisterday::Gist.new(options)
         gist.add_file(file)
         gist.push_gist
-			end
-	end
+      end
+  end
 end
 
