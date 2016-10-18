@@ -10,8 +10,9 @@ module Gisterday
 	class GitHubAuth
 		attr_accessor :username, :password, :two_factor, :base_request_options
 
-    def initialize
-      get_credentials
+    def initialize(username,password)
+      @username = username
+      @password = password
       @base_request_options = {
         :headers => {
           'User-Agent' => 'gisterday'
@@ -27,41 +28,33 @@ module Gisterday
       }
     end
 
-		def get_credentials
-			puts "What is your username?"
-			@username = STDIN.gets.chomp
-			`stty -echo`
-			puts "What is your password?"
-			@password = STDIN.gets.chomp
-			`stty echo`
-		end
-
     def auth_request(options)
       HTTParty.post(AUTH_URL,options)
     end
 
 		def begin_authentication
-      request = auth_request(@base_request_options)
+      response = auth_request(@base_request_options)
 
-			if request.code == 401 && request.headers["X-GitHub-OTP"].match(/required/)
+			if response.code == 401 && response.headers["X-GitHub-OTP"].match(/required/)
 				puts "Enter Two-Factor Auth Code:"
 				@two_factor = STDIN.gets.chomp
 				finish_authentication
-      elsif request.code == 201 && request['token']
-        write_token_file(TOKEN_LOCATION,request['token'])
+      elsif response.code == 201 && response['token']
+        write_token_file(TOKEN_LOCATION,response['token'])
       else
-        puts "Request returned with the code: #{request.code}"
+        puts "Request returned with the code: #{response.code}"
 			end
 		end
 
 		def finish_authentication
       @base_request_options[:headers]['X-GitHub-OTP'] = @two_factor
-      request = auth_request(@base_request_options)
+      response = auth_request(@base_request_options)
 
-			if request.code == 201
-				write_token_file(TOKEN_LOCATION,request['token'])
+			if response.code == 201
+				write_token_file(TOKEN_LOCATION,response['token'])
       else
-        puts "Request returned with the code: #{request.code}"
+        puts "Request returned with the code: #{response.code}"
+        puts response
 			end
 		end
 
@@ -72,49 +65,53 @@ module Gisterday
 		end
 	end
 
-	def self.read_file(file)
-		File.read(file)
-	end
-
-  def self.get_token
-    begin
-      read_file(TOKEN_LOCATION)
-    rescue
-      false
+  class Gist
+    attr_accessor :options, :headers, :body
+    
+    def initialize(options)
+      @options = options
+      @headers = {'User-Agent' => 'gisterday'}
+      @body = {
+        'description' => @options[:description] || "Gist created using Gisterday",
+        'public' => true,
+        'files' => {}
+        }
     end
+
+  	def read_file(file)
+  		File.read(file)
+  	end
+
+    def get_token
+      begin
+        read_file(TOKEN_LOCATION)
+      rescue
+        false
+      end
+    end
+
+    def add_file(file)
+      @body['files'][file] = {"content" => read_file(file)}
+    end
+
+    def push_gist
+      if get_token && @options[:anonymous] == nil
+        @headers['Authorization'] = "token #{get_token}"
+      end
+
+      response = HTTParty.post(GIST_URL,:body => @body.to_json, :headers => @headers) 
+      format_response(response)
+    end
+
+  	def format_response(response)
+      STDOUT.puts %Q{
+
+        #{JSON.parse(response.body) if @options[:verbose]}
+
+
+        New Gist created at:
+        #{JSON.parse(response.body)['html_url']}
+      }
+  	end
   end
-
-	def self.create_gist(filename,gist_content,options)
-		request_options = {
-			:headers => {	'User-Agent' => 'gisterday'	},
-			:body => {
-			  'description' => options[:description] || "Gist created using Gisterday",
-			  'public' => true,
-			  'files' => {
-			    filename => {
-			      'content' => gist_content
-			    }
-			  }
-			}.to_json
-		}
-
-    if get_token && options[:anonymous] == nil
-			request_options[:headers]['Authorization'] = "token #{get_token}"
-		end
-
-		req = HTTParty.post(GIST_URL,request_options)	
-    puts "Here are the options..."
-    puts options
-		format_response(req,options)
-	end
-
-	def self.format_response(response,options)
-		STDOUT.puts ""
-		STDOUT.puts JSON.parse(response.body) if options[:verbose]
-		STDOUT.puts ""
-		STDOUT.puts ""
-		STDOUT.puts "New Gist created at:"
-		STDOUT.puts JSON.parse(response.body)['html_url']
-		STDOUT.puts ""
-	end
 end
