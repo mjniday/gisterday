@@ -49,7 +49,7 @@ else
     when "help"
       puts opt_parser
     else
-      file = ARGV[0] || "gisterday_file.rb"
+      file = ARGV[0] || "gisterday_file.txt"
       # if `file` gets saved, it will be in the current directory
       system %Q(vim +"put ='# When you save this file, a gist will be created.'" #{file})
 
